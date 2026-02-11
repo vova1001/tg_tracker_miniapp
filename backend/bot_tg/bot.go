@@ -32,12 +32,12 @@ func StartBot(token string) {
 
 		if update.Message.Text == "/start" {
 
-			text := "Привет! Нажми кнопку ниже, чтобы открыть Mini App."
+			text := "Привет! Нажми кнопку ниже, чтобы открыть Mini App Tracker."
 
 			btn := map[string]interface{}{
 				"text": "Открыть Mini App",
 				"web_app": map[string]string{
-					"url": "https://example.com",
+					"url": "https://tg-tracker-miniapp.onrender.com/",
 				},
 			}
 
