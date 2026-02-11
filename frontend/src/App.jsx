@@ -1,14 +1,29 @@
-import { useAuth } from "./auth/useAuth";
-import Dashboard from "./pages/Dashboard";
-import Loading from "./pages/Loading";
+import React from "react";
+import DashboardButton from "./components/DashboardButton";
 
-function App() {
-  const { user, loading } = useAuth();
+export default function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-100 to-blue-50 flex flex-col justify-between">
+      
+      {/* Шапка */}
+      <header className="text-center mt-8">
+        <h1 className="text-4xl font-extrabold text-blue-700 drop-shadow-md">
+          Ваш Трекер
+        </h1>
+      </header>
 
-  if (loading) return <Loading />;
-  if (!user) return <div>Auth failed</div>;
+      {/* Центр с кнопками */}
+      <main className="flex flex-col items-center gap-6 mt-12">
+        <DashboardButton label="Статистика" />
+        <DashboardButton label="Добавить действие" />
+        <DashboardButton label="Выставить напоминание" />
+        <DashboardButton label="Выбрать день" />
+      </main>
 
-  return <Dashboard user={user} />;
+      {/* Подвал */}
+      <footer className="text-center mb-4 text-gray-500 text-sm">
+        Created by LilPupsik ❤️
+      </footer>
+    </div>
+  );
 }
-
-export default App;
