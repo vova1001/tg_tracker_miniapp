@@ -1,9 +1,7 @@
-export function getTelegram() {
-  if (window.Telegram && window.Telegram.WebApp) return window.Telegram.WebApp;
-  return null;
-}
-
+// src/telegram/telegram.js
 export function getInitData() {
-  const tg = getTelegram();
-  return tg ? tg.initData : null;
+  if (window.Telegram?.WebApp?.initData) {
+    return window.Telegram.WebApp.initData;
+  }
+  return null;
 }

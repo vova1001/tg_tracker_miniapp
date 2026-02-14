@@ -1,31 +1,43 @@
-import { useEffect, useState } from "react";
-import { getInitData } from "../telegram/telegram";
-import { api } from "../api/client";
+// src/auth/useAuth.js
+import { useEffect, useState } from 'react';
+import { getInitData } from '../telegram/telegram';
+import { authAPI } from '../api/client';
 
 export function useAuth() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function authenticate() {
       try {
+        setLoading(true);
+        
+        // 1. Получаем initData
         const initData = getInitData();
-        if (!initData) throw new Error("Not opened in Telegram");
+        if (!initData) {
+          throw new Error('Not in Telegram');
+        }
 
-        const data = await api("/auth", {
-          method: "POST",
-          body: JSON.stringify({ initData }),
-        });
-
-        setUser(data.user);
+        // 2. Отправляем на бек (получаем куку)
+        await authAPI.login(initData);
+        
+        // 3. Теперь запрашиваем данные пользователя (кука уже есть!)
+        const userData = await authAPI.getCurrentUser();
+        
+        // 4. Сохраняем пользователя
+        setUser(userData);
+        
       } catch (err) {
-        console.error(err);
+        console.error('Auth error:', err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     }
+
     authenticate();
   }, []);
 
-  return { user, loading };
+  return { user, loading, error };
 }

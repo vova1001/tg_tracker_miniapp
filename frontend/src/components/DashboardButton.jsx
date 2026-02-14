@@ -1,17 +1,13 @@
-import React from "react";
-import { motion } from "framer-motion";
+// src/components/DashboardButton.jsx
+import React from 'react';
 
-export default function DashboardButton({ label }) {
+export default function DashboardButton({ label, onClick }) {
   return (
-  <motion.button
-  whileHover={{ scale: 1.05, boxShadow: "0 10px 20px rgba(0,0,0,0.15)" }}
-  whileTap={{ scale: 0.95 }}
-  className="w-64 py-4 bg-gradient-to-r from-green-400 to-green-500
-             text-white font-semibold rounded-2xl shadow-md
-             hover:shadow-xl transition-all duration-300"
->
-  {label}
-</motion.button>
-
+    <button 
+      onClick={onClick}
+      className="w-full px-6 py-4 bg-white/80 backdrop-blur-sm border border-green-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 text-gray-700 font-medium text-lg"
+    >
+      {label}
+    </button>
   );
 }
