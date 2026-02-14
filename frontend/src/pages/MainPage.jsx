@@ -1,51 +1,52 @@
-import DashboardButton from "../components/DashboardButton";
-import { useAuth } from "../auth/useAuth";
+import { useNavigate } from 'react-router-dom';
+import DashboardButton from '../components/DashboardButton';
+import { useAuth } from '../auth/useAuth';
 
 export default function MainPage() {
-  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { user, loading, error } = useAuth();
+
+  console.log("user в MainPage:", user);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-blue-50">
-        <p className="text-blue-900">Загрузка...</p>
+      <div className="flex items-center justify-center min-h-screen bg-blue-50">
+        <p className="text-gray-500">Загрузка...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-blue-50">
+        <p className="text-red-500">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-start h-full px-4 pt-12">
-      {/* Заголовок */}
-      <h1 className="text-4xl sm:text-5xl font-bold text-blue-900 mb-8">
+    <div className="flex flex-col items-center justify-start min-h-screen pt-12 px-4 bg-blue-50">
+      <h1 className="text-4xl sm:text-5xl font-bold text-blue-900 text-center mb-6">
         Ваш трекер
       </h1>
 
-      {/* Аватарка с рамкой */}
-      <div className="relative mb-3">
-        <div className="w-36 h-36 rounded-full border-4 border-blue-300 overflow-hidden shadow-lg">
-          {user?.AvatarURL ? (
-            <img
-              src={user.AvatarURL}
-              alt="User avatar"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-blue-100 text-blue-700 text-xl font-bold">
-              ?
-            </div>
-          )}
+      {/* 🔹 Фото пользователя в круглой рамке */}
+      {user?.photo_url && (
+        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-blue-300 mb-2">
+          <img
+            src={user.photo_url}
+            alt="avatar"
+            className="w-full h-full object-cover"
+          />
         </div>
-      </div>
+      )}
 
-      {/* Telegram тег */}
-      <div className="mb-12 min-h-[1.5rem]">
-        {user?.TgTag ? (
-          <p className="text-blue-900 font-medium text-lg">@{user.TgTag}</p>
-        ) : (
-          <p className="text-blue-400 font-medium text-lg">Нет тега</p>
-        )}
-      </div>
+      {/* 🔹 Telegram username */}
+      {user?.username && (
+        <p className="text-blue-900 font-medium mb-8">@{user.username}</p>
+      )}
 
-      {/* Кнопки */}
+      {/* 🔹 Кнопки перехода */}
       <div className="flex flex-col gap-4 w-full max-w-md">
         <DashboardButton label="Трекер привычек" to="/habits" />
         <DashboardButton label="Ежедневник" to="/diary" />
