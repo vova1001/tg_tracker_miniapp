@@ -1,11 +1,18 @@
-// src/components/DashboardButton.jsx
-import React from 'react';
+import { useNavigate } from "react-router-dom";
 
-export default function DashboardButton({ label, onClick }) {
+export default function DashboardButton({ label, to }) {
+  const navigate = useNavigate();
+
   return (
-    <button 
-      onClick={onClick}
-      className="w-full px-6 py-4 bg-white/80 backdrop-blur-sm border border-green-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 text-gray-700 font-medium text-lg"
+    <button
+      onClick={() => navigate(to)}
+      className="w-full py-4 rounded-xl
+                 border-2 border-blue-300
+                 text-blue-900 font-semibold
+                 bg-white
+                 shadow-md
+                 hover:bg-blue-50 hover:shadow-lg
+                 transition-all duration-300"
     >
       {label}
     </button>
