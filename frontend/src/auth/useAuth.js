@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getInitData } from '../telegram/telegram';
+import { getInitData, getUserData, waitForTelegram } from '../telegram/telegram';
 import { authAPI } from '../api/client';
 
 export function useAuth() {
@@ -8,10 +8,10 @@ export function useAuth() {
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
 
-  // функция добавления логов
-  function addLog(message) {
-    setLogs(prev => [...prev, message]);
-    console.log(message); // для разработчика
+  function addLog(message, data = '') {
+    const logMessage = `${new Date().toLocaleTimeString()}: ${message} ${data}`;
+    setLogs(prev => [...prev, logMessage]);
+    console.log(logMessage);
   }
 
   useEffect(() => {
@@ -20,40 +20,53 @@ export function useAuth() {
         setLoading(true);
         addLog("🔥 Mini App открыт");
 
+        // ЖДЕМ Telegram (это критично!)
+        addLog("⏳ Ожидание Telegram WebApp...");
+        const telegramReady = await waitForTelegram();
+        addLog("Telegram WebApp готов:", telegramReady ? 'да' : 'нет');
+
+        // Получаем данные пользователя напрямую из Telegram
+        const tgUser = getUserData();
+        addLog("Пользователь Telegram:", tgUser ? JSON.stringify(tgUser) : 'не найден');
+
         // 1️⃣ Получаем initData
         let initData = getInitData();
-        addLog("1️⃣ InitData получено от Telegram: " + JSON.stringify(initData));
-
-        // Локальная заглушка для разработки
-        if (!initData && import.meta.env.MODE === 'development') {
-          initData = "dummy_init_data_for_local_dev";
-          addLog("⚠️ Локальная разработка: используем заглушку initData");
-        }
+        addLog("1️⃣ InitData от Telegram:", initData ? 'получена' : 'отсутствует');
 
         if (!initData) {
-          throw new Error("Not in Telegram WebApp");
+          // В режиме разработки используем тестовые данные
+          if (import.meta.env.MODE === 'development') {
+            initData = "test_init_data";
+            addLog("⚠️ Режим разработки: используем тестовые данные");
+          } else {
+            // Если есть пользователь Telegram, но нет initData - создаем заглушку
+            if (tgUser) {
+              initData = JSON.stringify({ user: tgUser });
+              addLog("⚠️ Создана заглушка initData из пользователя");
+            } else {
+              throw new Error("Не удалось получить данные от Telegram. Убедитесь, что приложение открыто через Telegram.");
+            }
+          }
         }
 
         // 2️⃣ Отправляем initData на бек
-        addLog("2️⃣ Отправляю initData на бек для проверки...");
+        addLog("2️⃣ Отправка initData на сервер...");
         const loginRes = await authAPI.login(initData);
-        addLog("✅ Ответ login от бэка: " + JSON.stringify(loginRes));
+        addLog("✅ Ответ сервера:", JSON.stringify(loginRes));
 
         // 3️⃣ Запрашиваем данные пользователя
-        addLog("3️⃣ Запрашиваю getCurrentUser...");
+        addLog("3️⃣ Запрос данных пользователя...");
         const userData = await authAPI.getCurrentUser();
-        addLog("✅ UserData с бекенда: " + JSON.stringify(userData));
+        addLog("✅ Данные пользователя:", JSON.stringify(userData));
 
-        // 4️⃣ Сохраняем пользователя
         setUser(userData);
-        addLog("4️⃣ Пользователь сохранён в стейт");
+        addLog("4️⃣ Пользователь сохранён");
 
       } catch (err) {
-        addLog("❌ Ошибка: " + err.message);
+        addLog("❌ Ошибка:", err.message);
         setError(err.message);
       } finally {
         setLoading(false);
-        addLog("🔚 Аутентификация завершена");
       }
     }
 
