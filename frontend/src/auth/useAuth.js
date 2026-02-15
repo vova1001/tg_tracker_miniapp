@@ -11,44 +11,45 @@ export function useAuth() {
   // функция добавления логов
   function addLog(message) {
     setLogs(prev => [...prev, message]);
-    console.log(message); // для разработки
+    console.log(message); // для разработчика
   }
 
   useEffect(() => {
     async function authenticate() {
       try {
         setLoading(true);
-        addLog("🔥 Старт аутентификации");
+        addLog("🔥 Mini App открыт");
 
         // 1️⃣ Получаем initData
-        const initData = getInitData();
-        addLog("1️⃣ InitData получено: " + JSON.stringify(initData));
+        let initData = getInitData();
+        addLog("1️⃣ InitData получено от Telegram: " + JSON.stringify(initData));
 
-        if (!initData) {
-          addLog("⚠️ initData отсутствует!");
-          if (import.meta.env.MODE === 'development') {
-            addLog("Локальная разработка: используем заглушку");
-          } else {
-            throw new Error('Not in Telegram WebApp');
-          }
+        // Локальная заглушка для разработки
+        if (!initData && import.meta.env.MODE === 'development') {
+          initData = "dummy_init_data_for_local_dev";
+          addLog("⚠️ Локальная разработка: используем заглушку initData");
         }
 
-        // 2️⃣ Отправка на бек (login)
-        addLog("2️⃣ Отправляю login на бек...");
-        const loginRes = await authAPI.login(initData);
-        addLog("✅ Login успешен, ответ бэка: " + JSON.stringify(loginRes));
+        if (!initData) {
+          throw new Error("Not in Telegram WebApp");
+        }
 
-        // 3️⃣ Получение данных пользователя
+        // 2️⃣ Отправляем initData на бек
+        addLog("2️⃣ Отправляю initData на бек для проверки...");
+        const loginRes = await authAPI.login(initData);
+        addLog("✅ Ответ login от бэка: " + JSON.stringify(loginRes));
+
+        // 3️⃣ Запрашиваем данные пользователя
         addLog("3️⃣ Запрашиваю getCurrentUser...");
         const userData = await authAPI.getCurrentUser();
-        addLog("✅ UserData получены: " + JSON.stringify(userData));
+        addLog("✅ UserData с бекенда: " + JSON.stringify(userData));
 
-        // 4️⃣ Сохраняем пользователя в стейт
+        // 4️⃣ Сохраняем пользователя
         setUser(userData);
         addLog("4️⃣ Пользователь сохранён в стейт");
 
       } catch (err) {
-        addLog("❌ Ошибка аутентификации: " + err.message);
+        addLog("❌ Ошибка: " + err.message);
         setError(err.message);
       } finally {
         setLoading(false);
