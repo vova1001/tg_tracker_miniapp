@@ -20,53 +20,43 @@ export function useAuth() {
         setLoading(true);
         addLog("🔥 Mini App открыт");
 
-        // ЖДЕМ Telegram (это критично!)
+        // Ждем Telegram
         addLog("⏳ Ожидание Telegram WebApp...");
-        const telegramReady = await waitForTelegram();
-        addLog("Telegram WebApp готов:", telegramReady ? 'да' : 'нет');
+        await waitForTelegram();
+        addLog("✅ Telegram WebApp готов");
 
-        // Получаем данные пользователя напрямую из Telegram
+        // Получаем данные пользователя из Telegram (для инфо)
         const tgUser = getUserData();
-        addLog("Пользователь Telegram:", tgUser ? JSON.stringify(tgUser) : 'не найден');
+        addLog("📱 Telegram user:", tgUser ? JSON.stringify(tgUser) : 'не найден');
 
-        // 1️⃣ Получаем initData
+        // Получаем initData
         let initData = getInitData();
-        addLog("1️⃣ InitData от Telegram:", initData ? 'получена' : 'отсутствует');
+        addLog("📦 InitData:", initData ? 'получена' : 'нет');
 
         if (!initData) {
-          // В режиме разработки используем тестовые данные
           if (import.meta.env.MODE === 'development') {
             initData = "test_init_data";
-            addLog("⚠️ Режим разработки: используем тестовые данные");
+            addLog("⚠️ Режим разработки: тестовые данные");
           } else {
-            // Если есть пользователь Telegram, но нет initData - создаем заглушку
-            if (tgUser) {
-              initData = JSON.stringify({ user: tgUser });
-              addLog("⚠️ Создана заглушка initData из пользователя");
-            } else {
-              throw new Error("Не удалось получить данные от Telegram. Убедитесь, что приложение открыто через Telegram.");
-            }
+            throw new Error("Нет initData от Telegram");
           }
         }
 
-        // 2️⃣ Отправляем initData на бек
-        addLog("2️⃣ Отправка initData на сервер...");
-        const loginRes = await authAPI.login(initData);
-        addLog("✅ Ответ сервера:", JSON.stringify(loginRes));
+        // 🔥 ОДИН ЗАПРОС на бек
+        addLog("📤 Отправка на /entry...");
+        const response = await authAPI.entry(initData);
+        addLog("✅ Ответ:", JSON.stringify(response));
 
-        // 3️⃣ Запрашиваем данные пользователя
-        addLog("3️⃣ Запрос данных пользователя...");
-        const userData = await authAPI.getCurrentUser();
-        addLog("✅ Данные пользователя:", JSON.stringify(userData));
-
-        setUser(userData);
-        addLog("4️⃣ Пользователь сохранён");
+        // response уже содержит user (бек возвращает ResponseUserAndSession)
+        setUser(response.user);
+        addLog(`👤 Пользователь: ${response.user.first_name} ${response.user.last_name || ''}`);
 
       } catch (err) {
         addLog("❌ Ошибка:", err.message);
         setError(err.message);
       } finally {
         setLoading(false);
+        addLog("🏁 Готово");
       }
     }
 

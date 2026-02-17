@@ -1,20 +1,12 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from 'react-router-dom';
 
 export default function DashboardButton({ label, to }) {
-  const navigate = useNavigate();
-
   return (
-    <button
-      onClick={() => navigate(to)}
-      className="w-full py-4 rounded-xl
-                 border-2 border-blue-300
-                 text-blue-900 font-semibold
-                 bg-white
-                 shadow-md
-                 hover:bg-blue-50 hover:shadow-lg
-                 transition-all duration-300"
+    <Link
+      to={to}
+      className="w-full bg-white hover:bg-blue-50 text-blue-900 font-semibold py-4 px-6 rounded-xl shadow-md transition-all duration-300 transform hover:scale-105 border-2 border-blue-200 text-center"
     >
       {label}
-    </button>
+    </Link>
   );
 }

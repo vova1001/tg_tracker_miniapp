@@ -1,36 +1,24 @@
-// src/api/client.js
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
-export async function api(endpoint, options = {}) {
-  const url = `${API_URL}${endpoint}`;
-  
-  const res = await fetch(url, {
-    credentials: 'include', // ← обязательно для куки!
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
-
-  if (!res.ok) {
-    throw new Error('API error');
-  }
-
-  return res.json();
-}
+const API_URL = import.meta.env.MODE === 'development' 
+    ? 'http://localhost:8080'
+    : 'https://твой-бекенд.onrender.com';
 
 export const authAPI = {
-  // 1. Авторизация (получаем куку)
-  login: (initData) => {
-    return api('/auth', {
-      method: 'POST',
-      body: JSON.stringify({ initData }),
-    });
-  },
-  
-  // 2. Получение данных пользователя (уже с кукой)
-  getCurrentUser: () => {
-    return api('/auth/get-user'); // GET запрос, кука улетит автоматически
-  }
+    // Один метод для входа
+    entry: async (initData) => {
+        const response = await fetch(`${API_URL}/entry`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include', // для куки
+            body: JSON.stringify({ initData }),
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.err || error.error || 'Entry failed');
+        }
+        
+        return response.json(); // { user, session_id }
+    }
 };
