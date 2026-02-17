@@ -30,8 +30,8 @@ type Session struct {
 }
 
 type ResponseUserAndSession struct {
-	User    *User
-	Session string
+	User    *User  `json:"user"`
+	Session string `json:"session_id"`
 }
 
 func CreateUser(bot_token string, rdb *redis.Client) gin.HandlerFunc {
@@ -41,18 +41,18 @@ func CreateUser(bot_token string, rdb *redis.Client) gin.HandlerFunc {
 		}
 		err := ctx.ShouldBindJSON(&req)
 		if err != nil {
-			ctx.JSON(400, gin.H{"err": err})
+			ctx.JSON(400, gin.H{"err": err.Error()})
 			ctx.Abort()
 			return
 		}
 		if !validDateTg(req.InitData, bot_token) {
-			ctx.JSON(400, gin.H{"err": err})
+			ctx.JSON(400, gin.H{"err": "Invalid Telegram data"})
 			ctx.Abort()
 			return
 		}
 		tgUser, err := ParseUser(req.InitData)
 		if err != nil {
-			ctx.JSON(400, gin.H{"err": err})
+			ctx.JSON(400, gin.H{"err": err.Error()})
 			ctx.Abort()
 			return
 		}
