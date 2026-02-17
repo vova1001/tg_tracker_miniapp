@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
@@ -15,30 +14,44 @@ import (
 )
 
 func main() {
-
 	err := godotenv.Load("../.env")
 	if err != nil {
-		fmt.Println("ENV ERROR")
+		log.Println("No .env file found")
 	}
+
 	ctx := context.Background()
 	token := os.Getenv("TELEGRAM_BOT_TOKEN")
-	redisURL := os.Getenv("REDIS_URL")
-	log.Println("Using default Redis address:", redisURL)
+	if token == "" {
+		log.Fatal("TELEGRAM_BOT_TOKEN not set")
+	}
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: redisURL,
-	})
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://default:LnyKT0XHx6OXn2oGtht1BINwl0TWCHKd@redis-15345.c16.us-east-1-2.ec2.cloud.redislabs.com:15345"
+		log.Println("Using Redis Cloud (local config)")
+	} else {
+		log.Println("Using Redis from env:", redisURL)
+	}
+
+	opt, err := redis.ParseURL(redisURL)
+	if err != nil {
+		log.Fatal("Failed to parse Redis URL:", err)
+	}
+
+	rdb := redis.NewClient(opt)
 
 	_, err = rdb.Ping(ctx).Result()
 	if err != nil {
 		log.Fatal("Failed to connect to Redis:", err)
 	}
-
-	log.Println("Connected to Redis at", redisURL)
+	log.Println("Connected to Redis Cloud")
 
 	go b.StartBot(token)
+	log.Println("Bot started")
 
 	router := gin.Default()
 	r.RoutRegister(router, token, rdb)
+
+	log.Println("API server on :8080")
 	router.Run(":8080")
 }
