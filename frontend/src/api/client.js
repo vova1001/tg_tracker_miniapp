@@ -1,5 +1,5 @@
 // Просто и понятно - для разработки
-const API_URL = 'http://localhost:8080';
+const API_URL = 'https://tg-tracker-miniapp-backend.onrender.com';
 
 // Когда будешь деплоить на Render, просто заменишь одну строку:
 // const API_URL = 'https://твой-бекенд.onrender.com';
