@@ -1,16 +1,17 @@
-const API_URL = import.meta.env.MODE === 'development' 
-    ? 'http://localhost:8080'
-    : 'https://твой-бекенд.onrender.com';
+// Просто и понятно - для разработки
+const API_URL = 'http://localhost:8080';
+
+// Когда будешь деплоить на Render, просто заменишь одну строку:
+// const API_URL = 'https://твой-бекенд.onrender.com';
 
 export const authAPI = {
-    // Один метод для входа
     entry: async (initData) => {
         const response = await fetch(`${API_URL}/entry`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            credentials: 'include', // для куки
+            credentials: 'include',
             body: JSON.stringify({ initData }),
         });
         
@@ -19,6 +20,6 @@ export const authAPI = {
             throw new Error(error.err || error.error || 'Entry failed');
         }
         
-        return response.json(); // { user, session_id }
+        return response.json();
     }
 };
