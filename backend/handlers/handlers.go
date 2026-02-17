@@ -90,8 +90,6 @@ func CreateUser(bot_token string, rdb *redis.Client) gin.HandlerFunc {
 func validDateTg(initData string, bot_token string) bool {
 	log.Println("🔍 Валидация initData")
 	log.Println("  Token length:", len(bot_token))
-	log.Println("  InitData length:", len(initData))
-	log.Println("  InitData preview:", initData[:min(100, len(initData))])
 
 	params := make(map[string]string)
 	pairs := strings.Split(initData, "&")
@@ -104,11 +102,17 @@ func validDateTg(initData string, bot_token string) bool {
 		if len(kv) != 2 {
 			continue
 		}
-		key, value := kv[0], kv[1]
+		key := kv[0]
+
+		// 🔥 Декодируем значение!
+		value, err := url.QueryUnescape(kv[1])
+		if err != nil {
+			value = kv[1] // если ошибка, оставляем как есть
+		}
 
 		if key == "hash" {
 			hash = value
-			log.Println("  Hash found:", hash[:min(20, len(hash))]+"...")
+			log.Println("  Hash found")
 		}
 
 		params[key] = value
@@ -129,18 +133,8 @@ func validDateTg(initData string, bot_token string) bool {
 
 	result := computedHash == hash
 	log.Println("  Hash match:", result)
-	if !result {
-		log.Println("  Computed:", computedHash[:min(20, len(computedHash))]+"...")
-	}
 
 	return result
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func ParseUser(initData string) (*User, error) {
