@@ -11,7 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	b "github.com/vova1001/tg_tracker_miniapp/bot_tg"
-	h "github.com/vova1001/tg_tracker_miniapp/handlers"
+	r "github.com/vova1001/tg_tracker_miniapp/router"
 )
 
 func main() {
@@ -36,9 +36,9 @@ func main() {
 
 	log.Println("Connected to Redis at", redisURL)
 
-	b.StartBot(token)
+	go b.StartBot(token)
 
 	router := gin.Default()
-	h.RoutRegister(router, token, rdb)
+	r.RoutRegister(router, token, rdb)
 	router.Run(":8080")
 }

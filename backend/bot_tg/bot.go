@@ -26,6 +26,7 @@ func StartBot(token string) {
 		if update.Message == nil {
 			continue
 		}
+
 		fmt.Println(update.Message.From.UserName, " ", update.Message.Text)
 
 		chatID := update.Message.Chat.ID
@@ -34,25 +35,24 @@ func StartBot(token string) {
 
 			text := "Привет! Нажми кнопку ниже, чтобы открыть Mini App Tracker."
 
-			btn := map[string]interface{}{
-				"text": "Открыть Mini App",
-				"web_app": map[string]string{
-					"url": "https://tg-tracker-miniapp.onrender.com/",
+			inlineBtn := tgbotapi.InlineKeyboardButton{
+				Text: "Открыть Mini App",
+				WebApp: &tgbotapi.WebAppInfo{
+					URL: "https://tg-tracker-miniapp.onrender.com/",
 				},
 			}
 
-			keyboard := map[string]interface{}{
-				"keyboard": [][]map[string]interface{}{
-					{btn},
-				},
-				"resize_keyboard": true,
-			}
+			inlineKeyboard := tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(inlineBtn),
+			)
 
 			msg := tgbotapi.NewMessage(chatID, text)
-			msg.ReplyMarkup = keyboard
-			bot.Send(msg)
+			msg.ReplyMarkup = inlineKeyboard
 
+			_, err := bot.Send(msg)
+			if err != nil {
+				log.Println("Ошибка отправки сообщения:", err)
+			}
 		}
-
 	}
 }
