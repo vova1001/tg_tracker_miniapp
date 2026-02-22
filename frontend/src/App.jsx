@@ -8,6 +8,7 @@ import HabitTracker from "./pages/HabitTracker";
 import Diary from "./pages/Diary";
 import Notes from "./pages/Notes";
 import SettingsPage from "./pages/SettingsPage";
+import CreateHabit from "./components/CreateHabit"; // Импортируем компонент
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -28,6 +29,9 @@ export default function App() {
         <Route path="/diary" element={<Layout><Diary /></Layout>} />
         <Route path="/notes" element={<Layout><Notes /></Layout>} />
         <Route path="/settings" element={<Layout><SettingsPage /></Layout>} />
+        
+        {/* Роут для создания привычки - без Layout так как это отдельная страница */}
+        <Route path="/create-habit" element={<CreateHabit />} />
       </Routes>
     </BrowserRouter>
   );
