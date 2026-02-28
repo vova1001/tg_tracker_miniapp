@@ -5,24 +5,53 @@ import { Home, Repeat, BookOpen, StickyNote, Settings } from 'lucide-react';
 export default function CreateHabit() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedDate } = location.state || { selectedDate: new Date() };
   
+  // Получаем данные из state
+  const { selectedDate, habitToEdit } = location.state || { 
+    selectedDate: new Date(),
+    habitToEdit: null 
+  };
+  
+  console.log('Editing habit:', habitToEdit); // Для отладки
+
+  // Инициализируем форму данными из редактируемой привычки или пустыми значениями
   const [formData, setFormData] = useState({
-    emoji: '📝',
-    title: '',
-    description: '',
-    color: '#3B82F6',
-    group: 'Нет'
+    emoji: habitToEdit?.emoji || '📝',
+    title: habitToEdit?.title || '',
+    description: habitToEdit?.description || '',
+    color: habitToEdit?.color || '#3B82F6',
+    group: habitToEdit?.group || 'Нет'
   });
 
   // Состояния для шкалы измерения
-  const [scaleEnabled, setScaleEnabled] = useState(false);
-  const [scaleValue, setScaleValue] = useState('10');
-  const [scaleUnit, setScaleUnit] = useState('');
+  const [scaleEnabled, setScaleEnabled] = useState(!!habitToEdit?.scale);
+  const [scaleValue, setScaleValue] = useState(habitToEdit?.scale?.value || '10');
+  const [scaleUnit, setScaleUnit] = useState(habitToEdit?.scale?.unit || 'шт');
+  const [customUnit, setCustomUnit] = useState('');
+  const [showCustomUnit, setShowCustomUnit] = useState(false);
+
+  // Сохраняем прогресс из редактируемой привычки (только для внутреннего использования)
+  const savedProgress = habitToEdit?.progress || 0;
+
+  // Предустановленные единицы измерения
+  const presetUnits = [
+    { value: 'шт', label: 'Штуки', emoji: '📦' },
+    { value: 'км', label: 'Километры', emoji: '🏃' },
+    { value: 'м', label: 'Метры', emoji: '📏' },
+    { value: 'л', label: 'Литры', emoji: '💧' },
+    { value: 'мл', label: 'Миллилитры', emoji: '🥛' },
+    { value: 'кг', label: 'Килограммы', emoji: '🏋️' },
+    { value: 'г', label: 'Граммы', emoji: '⚖️' },
+    { value: 'мин', label: 'Минуты', emoji: '⏱️' },
+    { value: 'ч', label: 'Часы', emoji: '⏰' },
+    { value: 'стр', label: 'Страницы', emoji: '📄' },
+    { value: 'раз', label: 'Раз', emoji: '🔄' },
+    { value: 'подход', label: 'Подходы', emoji: '💪' },
+  ];
 
   // Состояния для напоминания
-  const [reminderEnabled, setReminderEnabled] = useState(false);
-  const [reminderTimes, setReminderTimes] = useState(['09:00']);
+  const [reminderEnabled, setReminderEnabled] = useState(habitToEdit?.reminders?.length > 0);
+  const [reminderTimes, setReminderTimes] = useState(habitToEdit?.reminders || ['09:00']);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showGroupInput, setShowGroupInput] = useState(false);
@@ -37,24 +66,40 @@ export default function CreateHabit() {
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    const newHabit = {
-      ...formData,
-      id: Date.now(),
-      date: selectedDate.toDateString(),
-      completed: false,
-      progress: 0,
-      scale: scaleEnabled ? { value: scaleValue, unit: scaleUnit } : null,
-      reminders: reminderEnabled ? reminderTimes : []
-    };
-    
-    const existingHabits = JSON.parse(localStorage.getItem('habits') || '[]');
-    const updatedHabits = [...existingHabits, newHabit];
-    localStorage.setItem('habits', JSON.stringify(updatedHabits));
-    
-    navigate('/habits');
+  e.preventDefault();
+  
+  // Определяем финальную единицу измерения
+  const finalUnit = showCustomUnit ? customUnit : scaleUnit;
+  
+  const habitData = {
+    ...formData,
+    id: habitToEdit?.id || Date.now(),
+    date: selectedDate.toDateString(), // используем selectedDate из state
+    completed: false,
+    progress: savedProgress,
+    scale: scaleEnabled ? { 
+      value: scaleValue, 
+      unit: finalUnit 
+    } : null,
+    reminders: reminderEnabled ? reminderTimes : []
   };
+  
+  const existingHabits = JSON.parse(localStorage.getItem('habits') || '[]');
+  
+  let updatedHabits;
+  if (habitToEdit) {
+    updatedHabits = existingHabits.map(h => 
+      h.id === habitToEdit.id ? habitData : h
+    );
+  } else {
+    updatedHabits = [...existingHabits, habitData];
+  }
+  
+  localStorage.setItem('habits', JSON.stringify(updatedHabits));
+  
+  // ВАЖНО: передаем selectedDate обратно, чтобы остаться на том же дне
+  navigate('/habits', { state: { selectedDate: selectedDate } });
+};
 
   const handleGroupClick = () => {
     setShowGroupInput(true);
@@ -103,7 +148,7 @@ export default function CreateHabit() {
             </svg>
           </button>
           <h1 className="flex-1 text-center text-xl font-semibold text-blue-900">
-            Новая привычка
+            {habitToEdit ? 'Редактировать привычку' : 'Новая привычка'}
           </h1>
           <div className="w-10"></div>
         </div>
@@ -264,24 +309,109 @@ export default function CreateHabit() {
             </div>
 
             {scaleEnabled && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
+              <div className="space-y-4">
+                {/* Количество */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Сколько нужно сделать?</label>
                   <input
                     type="number"
                     value={scaleValue}
                     onChange={(e) => setScaleValue(e.target.value)}
                     placeholder="10"
-                    className="flex-1 h-10 px-3 rounded-xl bg-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800"
+                    className="w-full h-10 px-3 rounded-xl bg-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800"
+                    min="1"
                   />
-                  <span className="text-gray-500">× в день</span>
                 </div>
-                <input
-                  type="text"
-                  value={scaleUnit}
-                  onChange={(e) => setScaleUnit(e.target.value)}
-                  placeholder="Единица измерения (например: км, страниц, минут)"
-                  className="w-full h-10 px-3 rounded-xl bg-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800 placeholder-gray-400"
-                />
+
+                {/* Единицы измерения */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">В чем измеряем?</label>
+                  
+                  {/* Кнопки выбора единиц */}
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    {presetUnits.slice(0, 6).map(unit => (
+                      <button
+                        key={unit.value}
+                        type="button"
+                        onClick={() => {
+                          setScaleUnit(unit.value);
+                          setShowCustomUnit(false);
+                        }}
+                        className={`
+                          flex items-center justify-center gap-1 px-2 py-2 rounded-xl border-2 transition-all text-sm
+                          ${!showCustomUnit && scaleUnit === unit.value 
+                            ? 'border-blue-900 bg-blue-50' 
+                            : 'border-gray-200 hover:border-blue-400'
+                          }
+                        `}
+                      >
+                        <span>{unit.emoji}</span>
+                        <span>{unit.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {presetUnits.slice(6, 12).map(unit => (
+                      <button
+                        key={unit.value}
+                        type="button"
+                        onClick={() => {
+                          setScaleUnit(unit.value);
+                          setShowCustomUnit(false);
+                        }}
+                        className={`
+                          flex items-center justify-center gap-1 px-2 py-2 rounded-xl border-2 transition-all text-sm
+                          ${!showCustomUnit && scaleUnit === unit.value 
+                            ? 'border-blue-900 bg-blue-50' 
+                            : 'border-gray-200 hover:border-blue-400'
+                          }
+                        `}
+                      >
+                        <span>{unit.emoji}</span>
+                        <span>{unit.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Своя единица измерения */}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomUnit(!showCustomUnit)}
+                      className={`
+                        w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border-2 transition-all text-sm
+                        ${showCustomUnit 
+                          ? 'border-blue-900 bg-blue-50' 
+                          : 'border-gray-200 hover:border-blue-400'
+                        }
+                      `}
+                    >
+                      <span>✏️</span>
+                      <span>Своя единица</span>
+                    </button>
+
+                    {showCustomUnit && (
+                      <div className="mt-2">
+                        <input
+                          type="text"
+                          value={customUnit}
+                          onChange={(e) => setCustomUnit(e.target.value)}
+                          placeholder="например: глотков, подходов, кругов"
+                          className="w-full h-10 px-3 rounded-xl bg-gray-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-800"
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Информация о текущем прогрессе (только при редактировании) */}
+                {habitToEdit && savedProgress > 0 && (
+                  <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded-lg">
+                    ⏳ Текущий прогресс: {savedProgress}/{scaleValue} {scaleUnit}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -346,7 +476,7 @@ export default function CreateHabit() {
             type="submit"
             className="w-full bg-blue-900 text-white py-4 rounded-2xl text-lg font-medium hover:bg-blue-800 transition-colors mt-6"
           >
-            Сохранить
+            {habitToEdit ? 'Сохранить изменения' : 'Сохранить'}
           </button>
         </form>
       </div>

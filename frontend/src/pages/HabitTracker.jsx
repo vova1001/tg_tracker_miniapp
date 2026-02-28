@@ -1,77 +1,77 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
-import { Home, Repeat, BookOpen, StickyNote, Settings, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, NavLink } from 'react-router-dom';
+import { Home, Repeat, BookOpen, StickyNote, Settings, Sparkles, Filter } from 'lucide-react';
 import Calendar from '../components/Calendar';
 
 export default function HabitTracker() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [swipedHabitId, setSwipedHabitId] = useState(null);
   const [showButtons, setShowButtons] = useState({});
-  const [celebrationHabitId, setCelebrationHabitId] = useState(null);
-  const calendarButtonRef = useRef(null);
-  const calendarRef = useRef(null);
+  const [completedHabitId, setCompletedHabitId] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState('all');
+  const [showGroupFilter, setShowGroupFilter] = useState(false);
   
-  // Для мыши и тача
+  // Для свайпа
   const dragStartX = useRef(0);
   const dragCurrentX = useRef(0);
   const isDragging = useRef(false);
   const habitRefs = useRef({});
   const dragStartTime = useRef(0);
-  const dragOffset = useRef(0);
-
+  
+  // Для календаря
+  const calendarButtonRef = useRef(null);
+  const calendarRef = useRef(null);
+  const todayButtonRef = useRef(null);
+  const filterButtonRef = useRef(null);
+  const filterRef = useRef(null);
+  
   const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   
-  // Загружаем все привычки из localStorage
+  // При загрузке или возврате с создания задачи проверяем дату
+  useEffect(() => {
+    if (location.state?.selectedDate) {
+      setSelectedDate(new Date(location.state.selectedDate));
+    }
+  }, [location.state]);
+  
+  // Загружаем привычки из localStorage
   const [allHabits, setAllHabits] = useState(() => {
     const saved = localStorage.getItem('habits');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Сохраняем в localStorage при каждом изменении
+  // Сохраняем в localStorage при изменении
   useEffect(() => {
     localStorage.setItem('habits', JSON.stringify(allHabits));
   }, [allHabits]);
 
-  // Фильтруем привычки для выбранной даты
-  const habits = allHabits.filter(habit => 
-    habit.date === selectedDate.toDateString()
-  );
+  // Получаем все уникальные группы с их цветами
+  const groupColors = {};
+  allHabits.forEach(habit => {
+    if (habit.group && habit.group !== 'Нет' && !groupColors[habit.group]) {
+      groupColors[habit.group] = habit.color || '#3B82F6';
+    }
+  });
 
-  // Функция для увеличения прогресса
-  const increaseProgress = (habitId) => {
-    setAllHabits(prev => prev.map(habit => {
-      if (habit.id === habitId) {
-        const maxProgress = habit.scale?.value ? parseInt(habit.scale.value) : 1;
-        const newProgress = Math.min((habit.progress || 0) + 1, maxProgress);
-        const completed = newProgress >= maxProgress;
-        
-        // Если достигли максимума - запускаем эффект
-        if (completed && !habit.completed) {
-          setCelebrationHabitId(habitId);
-          setTimeout(() => setCelebrationHabitId(null), 1500);
-        }
-        
-        return {
-          ...habit,
-          progress: newProgress,
-          completed
-        };
-      }
-      return habit;
-    }));
-  };
+  const availableGroups = ['all', ...Object.keys(groupColors)];
+
+  // Фильтруем привычки для выбранной даты и группы
+  const habits = allHabits.filter(habit => {
+    const dateMatch = habit.date === selectedDate.toDateString();
+    const groupMatch = selectedGroup === 'all' || habit.group === selectedGroup;
+    return dateMatch && groupMatch;
+  });
 
   // Получение дней текущей недели
   const getWeekDays = () => {
     const today = new Date(selectedDate);
     const day = today.getDay();
     const diff = day === 0 ? 6 : day - 1;
-    
     const monday = new Date(today);
     monday.setDate(today.getDate() - diff);
-    
     const week = [];
     for (let i = 0; i < 7; i++) {
       const day = new Date(monday);
@@ -95,24 +95,53 @@ export default function HabitTracker() {
     const today = new Date();
     const selected = new Date(selectedDate);
     
-    if (isToday(selectedDate)) {
-      return 'Сегодня';
-    }
+    if (isToday(selectedDate)) return 'Сегодня';
     
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    if (selected.toDateString() === tomorrow.toDateString()) {
-      return 'Завтра';
-    }
+    if (selected.toDateString() === tomorrow.toDateString()) return 'Завтра';
     
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (selected.toDateString() === yesterday.toDateString()) {
-      return 'Вчера';
-    }
+    if (selected.toDateString() === yesterday.toDateString()) return 'Вчера';
     
     const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
     return `${selected.getDate()} ${months[selected.getMonth()]}`;
+  };
+
+  // Функция для возврата на сегодня
+  const goToToday = () => {
+    setSelectedDate(new Date());
+    if (isCalendarOpen) {
+      setIsCalendarOpen(false);
+    }
+  };
+
+  // Увеличение прогресса с анимацией завершения
+  const increaseProgress = (habitId) => {
+    setAllHabits(prev => prev.map(habit => {
+      if (habit.id === habitId && habit.scale) {
+        const maxProgress = parseInt(habit.scale.value) || 1;
+        const currentProgress = habit.progress || 0;
+        const newProgress = Math.min(currentProgress + 1, maxProgress);
+        const wasCompleted = habit.completed;
+        const isNowCompleted = newProgress >= maxProgress;
+        
+        if (!wasCompleted && isNowCompleted) {
+          setCompletedHabitId(habitId);
+          setTimeout(() => {
+            setCompletedHabitId(prev => prev === habitId ? null : prev);
+          }, 2000);
+        }
+        
+        return { 
+          ...habit, 
+          progress: newProgress,
+          completed: isNowCompleted
+        };
+      }
+      return habit;
+    }));
   };
 
   // Обработчики календаря
@@ -129,19 +158,50 @@ export default function HabitTracker() {
     closeCalendar();
   };
 
-  const handleDateCircleClick = (date) => {
-    setSelectedDate(date);
-  };
+  // Закрытие календаря при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isCalendarOpen && 
+          calendarRef.current && 
+          !calendarRef.current.contains(event.target) && 
+          calendarButtonRef.current && 
+          !calendarButtonRef.current.contains(event.target)) {
+        closeCalendar();
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCalendarOpen]);
+
+  // Закрытие фильтра групп при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showGroupFilter && 
+          filterRef.current && 
+          !filterRef.current.contains(event.target) && 
+          filterButtonRef.current && 
+          !filterButtonRef.current.contains(event.target)) {
+        setShowGroupFilter(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showGroupFilter]);
 
   // Обработчики свайпа
   const handleDragStart = (e, habitId) => {
+    if (completedHabitId === habitId) {
+      setCompletedHabitId(null);
+    }
+    
     const clientX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
     
     dragStartX.current = clientX;
     dragCurrentX.current = clientX;
     isDragging.current = true;
     dragStartTime.current = Date.now();
-    dragOffset.current = 0;
     
     if (swipedHabitId && swipedHabitId !== habitId) {
       setSwipedHabitId(null);
@@ -166,18 +226,10 @@ export default function HabitTracker() {
       translateX = Math.min(0, Math.max(-96, rawDiff));
     }
     
-    dragOffset.current = translateX;
-    
     const habitElement = habitRefs.current[habitId];
     if (habitElement) {
       habitElement.style.transition = 'none';
       habitElement.style.transform = `translateX(${translateX}px)`;
-    }
-    
-    if (translateX < -30) {
-      setShowButtons(prev => ({ ...prev, [habitId]: true }));
-    } else {
-      setShowButtons(prev => ({ ...prev, [habitId]: false }));
     }
     
     e.preventDefault();
@@ -201,6 +253,7 @@ export default function HabitTracker() {
           setShowButtons(prev => ({ ...prev, [habitId]: false }));
           habitElement.style.transform = 'translateX(0)';
         } else {
+          setSwipedHabitId(habitId);
           setShowButtons(prev => ({ ...prev, [habitId]: true }));
           habitElement.style.transform = 'translateX(-96px)';
         }
@@ -210,6 +263,7 @@ export default function HabitTracker() {
           setShowButtons(prev => ({ ...prev, [habitId]: true }));
           habitElement.style.transform = 'translateX(-96px)';
         } else {
+          setSwipedHabitId(null);
           setShowButtons(prev => ({ ...prev, [habitId]: false }));
           habitElement.style.transform = 'translateX(0)';
         }
@@ -227,49 +281,14 @@ export default function HabitTracker() {
       if (habitElement) {
         habitElement.style.transition = 'transform 0.2s ease';
         if (swipedHabitId === habitId) {
-          setShowButtons(prev => ({ ...prev, [habitId]: true }));
           habitElement.style.transform = 'translateX(-96px)';
         } else {
-          setShowButtons(prev => ({ ...prev, [habitId]: false }));
           habitElement.style.transform = 'translateX(0)';
         }
       }
       isDragging.current = false;
     }
   };
-
-  // Синхронизация свайпов
-  useEffect(() => {
-    habits.forEach(habit => {
-      const habitElement = habitRefs.current[habit.id];
-      if (habitElement) {
-        habitElement.style.transition = 'transform 0.2s ease';
-        if (swipedHabitId === habit.id) {
-          setShowButtons(prev => ({ ...prev, [habit.id]: true }));
-          habitElement.style.transform = 'translateX(-96px)';
-        } else {
-          setShowButtons(prev => ({ ...prev, [habit.id]: false }));
-          habitElement.style.transform = 'translateX(0)';
-        }
-      }
-    });
-  }, [swipedHabitId, habits]);
-
-  // Закрытие календаря при клике вне
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (isCalendarOpen && 
-          calendarRef.current && 
-          !calendarRef.current.contains(event.target) && 
-          calendarButtonRef.current && 
-          !calendarButtonRef.current.contains(event.target)) {
-        closeCalendar();
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isCalendarOpen]);
 
   // Закрыть свайп при клике вне
   useEffect(() => {
@@ -283,54 +302,124 @@ export default function HabitTracker() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [swipedHabitId]);
 
-  // Глобальные обработчики
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging.current) {
-        const activeHabitId = swipedHabitId;
-        if (activeHabitId) {
-          const habitElement = habitRefs.current[activeHabitId];
-          if (habitElement) {
-            habitElement.style.transition = 'transform 0.2s ease';
-            setShowButtons(prev => ({ ...prev, [activeHabitId]: true }));
-            habitElement.style.transform = 'translateX(-96px)';
-          }
-        }
-        isDragging.current = false;
-      }
-    };
-
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [swipedHabitId]);
-
   return (
     <div className="min-h-screen bg-blue-50">
       <div className="container mx-auto px-4 py-6 max-w-md pb-24">
         
-        {/* Шапка */}
-        <div className="flex items-center justify-end mb-8">
+        {/* Шапка с тремя кнопками */}
+        <div className="flex items-center justify-between mb-8">
+          {/* Кнопка "На сегодня" слева */}
           <button 
-            ref={calendarButtonRef}
-            onClick={toggleCalendar}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              isCalendarOpen 
-                ? 'bg-blue-900 text-white' 
-                : 'bg-white text-blue-900 hover:bg-blue-100'
-            } shadow-sm`}
+            ref={todayButtonRef}
+            onClick={goToToday}
+            className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-blue-900 hover:bg-blue-100 transition-colors"
+            title="Вернуться на сегодня"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M5 21v-4M3 19h4M19 3v4M17 5h4M19 21v-4M17 19h4M12 7v4m0 4v4m-4-4h4m4 0h-4" />
             </svg>
           </button>
-        </div>
 
-        {/* Заголовок */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-semibold text-blue-900">
+          {/* Заголовок по центру */}
+          <h2 className="text-xl font-semibold text-blue-900">
             {getHeaderText()}
           </h2>
+
+          {/* Кнопка фильтра групп и календарь */}
+          <div className="flex gap-2">
+            {/* Кнопка фильтра групп */}
+            <div className="relative">
+              <button 
+                ref={filterButtonRef}
+                onClick={() => setShowGroupFilter(!showGroupFilter)}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  selectedGroup !== 'all' 
+                    ? 'bg-blue-900 text-white' 
+                    : 'bg-white text-blue-900 hover:bg-blue-100'
+                } shadow-sm`}
+                title="Фильтр по группам"
+              >
+                <Filter size={18} />
+              </button>
+
+              {/* Выпадающее меню групп */}
+              {showGroupFilter && (
+                <div 
+                  ref={filterRef}
+                  className="absolute right-0 mt-2 w-48 bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl z-10 border border-gray-100 py-2"
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedGroup('all');
+                      setShowGroupFilter(false);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-purple-400" />
+                    <span className={selectedGroup === 'all' ? 'text-blue-900 font-medium' : 'text-gray-700'}>
+                      Все задачи
+                    </span>
+                  </button>
+                  
+                  {availableGroups.filter(g => g !== 'all').map(group => (
+                    <button
+                      key={group}
+                      onClick={() => {
+                        setSelectedGroup(group);
+                        setShowGroupFilter(false);
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3"
+                    >
+                      <div 
+                        className="w-5 h-5 rounded-full" 
+                        style={{ backgroundColor: groupColors[group] || '#3B82F6' }}
+                      />
+                      <span className={selectedGroup === group ? 'text-blue-900 font-medium' : 'text-gray-700'}>
+                        {group}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Кнопка календаря */}
+            <button 
+              ref={calendarButtonRef}
+              onClick={toggleCalendar}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                isCalendarOpen 
+                  ? 'bg-blue-900 text-white' 
+                  : 'bg-white text-blue-900 hover:bg-blue-100'
+              } shadow-sm`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Индикатор активного фильтра */}
+        {selectedGroup !== 'all' && (
+          <div className="mb-4 flex items-center justify-between bg-white/80 backdrop-blur-sm rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-4 h-4 rounded-full" 
+                style={{ backgroundColor: groupColors[selectedGroup] || '#3B82F6' }}
+              />
+              <span className="text-sm text-gray-600">
+                Группа: <span className="font-medium text-blue-900">{selectedGroup}</span>
+              </span>
+            </div>
+            <button
+              onClick={() => setSelectedGroup('all')}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Дни недели */}
         <div className="grid grid-cols-7 gap-2 mb-8">
@@ -338,24 +427,23 @@ export default function HabitTracker() {
             <div 
               key={index} 
               className="flex flex-col items-center cursor-pointer"
-              onClick={() => handleDateCircleClick(date)}
+              onClick={() => setSelectedDate(date)}
             >
               <span className="text-xs font-medium text-blue-400 mb-2">
                 {weekDays[index]}
               </span>
               <div 
                 className={`
-                  w-10 h-10 rounded-full flex items-center justify-center text-base font-medium
-                  border-2 transition-all
+                  w-10 h-10 rounded-full flex items-center justify-center text-base font-medium border-2
                   ${isToday(date) && !isSelected(date)
-                    ? 'border-blue-900 bg-transparent text-blue-900' 
+                    ? 'border-blue-900 bg-transparent text-blue-900 font-bold' 
                     : ''
                   }
                   ${isSelected(date)
                     ? 'border-blue-900 bg-blue-900 text-white' 
                     : 'border-blue-900 bg-transparent text-blue-900'
                   }
-                  hover:bg-blue-100 hover:border-blue-800
+                  hover:bg-blue-100 hover:border-blue-800 transition-all
                 `}
               >
                 {date.getDate()}
@@ -374,12 +462,14 @@ export default function HabitTracker() {
           </div>
         )}
 
-        {/* Список привычек для выбранной даты */}
-        <div className="space-y-3 mb-8">
+        {/* Список привычек с прокруткой */}
+        <div className="space-y-3 mb-8 max-h-[400px] overflow-y-auto pr-1">
           {habits.length > 0 ? (
             habits.map(habit => {
               const maxProgress = habit.scale?.value ? parseInt(habit.scale.value) : 1;
               const progressPercent = ((habit.progress || 0) / maxProgress) * 100;
+              const isCompleted = habit.completed;
+              const isAnimating = completedHabitId === habit.id;
               
               return (
                 <div 
@@ -402,103 +492,98 @@ export default function HabitTracker() {
                       transform: swipedHabitId === habit.id ? 'translateX(-96px)' : 'translateX(0)'
                     }}
                   >
-                    {/* Основной контент с цветной обводкой */}
+                    {/* Основной контент с цветной обводкой и анимацией */}
                     <div 
-                      className={`flex-1 bg-white rounded-2xl p-4 shadow-sm transition-all duration-300 ${
-                        celebrationHabitId === habit.id ? 'scale-105 shadow-xl' : ''
-                      }`}
+                      className={`
+                        flex-1 bg-white rounded-2xl p-4 shadow-sm transition-all duration-500
+                        ${isAnimating ? 'scale-[1.02] shadow-xl' : ''}
+                        ${isCompleted ? 'opacity-90' : ''}
+                      `}
                       style={{ 
                         borderLeft: `4px solid ${habit.color || '#3B82F6'}`,
-                        boxShadow: celebrationHabitId === habit.id ? `0 0 20px ${habit.color || '#3B82F6'}40` : ''
+                        boxShadow: isAnimating ? `0 0 20px ${habit.color || '#3B82F6'}80` : ''
                       }}
                     >
                       <div className="flex items-start gap-3">
                         <span className="text-2xl">{habit.emoji}</span>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
                             <span className="text-base font-medium text-blue-900">
                               {habit.title}
                             </span>
                           </div>
                           {habit.description && (
-                            <p className="text-sm text-blue-400 mt-0.5">
-                              {habit.description}
-                            </p>
+                            <p className="text-sm text-blue-400 mt-0.5">{habit.description}</p>
                           )}
                           
                           {/* Блок прогресса */}
                           {habit.scale && (
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-blue-900 font-medium">
-                                  {habit.progress || 0} / {habit.scale.value}
+                            <div className="mt-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-blue-900 font-medium">
+                                  {habit.progress || 0}/{habit.scale.value} {habit.scale.unit}
                                 </span>
-                                <span className="text-blue-400">
-                                  {habit.scale.unit}
-                                </span>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isCompleted) {
+                                      increaseProgress(habit.id);
+                                    }
+                                  }}
+                                  disabled={isCompleted}
+                                  className={`
+                                    w-7 h-7 rounded-full flex items-center justify-center text-lg font-medium transition-all
+                                    ${isCompleted 
+                                      ? 'bg-green-500 text-white cursor-not-allowed' 
+                                      : 'bg-blue-100 text-blue-900 hover:bg-blue-200'
+                                    }
+                                    ${isAnimating ? 'animate-bounce' : ''}
+                                  `}
+                                >
+                                  {isCompleted ? '✓' : '+'}
+                                </button>
                               </div>
                               
                               {/* Прогресс-бар */}
-                              <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div 
-                                  className="absolute top-0 left-0 h-full rounded-full transition-all duration-500 ease-out"
+                                  className="h-full rounded-full transition-all duration-500 ease-out"
                                   style={{ 
                                     width: `${progressPercent}%`,
                                     backgroundColor: habit.color || '#3B82F6'
                                   }}
                                 />
-                                
-                                {/* Эффект пульсации при достижении цели */}
-                                {habit.completed && (
-                                  <div className="absolute inset-0 bg-white/30 animate-pulse rounded-full" />
-                                )}
                               </div>
+
+                              {/* Сообщение о завершении */}
+                              {isAnimating && (
+                                <div className="mt-2 text-center">
+                                  <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600 animate-pulse">
+                                    <Sparkles size={16} />
+                                    Задача выполнена! 🎉
+                                    <Sparkles size={16} />
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                        
-                        {/* Кнопка для увеличения прогресса */}
-                        <button 
-                          className={`
-                            w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300
-                            ${habit.completed 
-                              ? 'bg-green-500 text-white hover:bg-green-600' 
-                              : 'bg-blue-100 text-blue-900 hover:bg-blue-200'
-                            }
-                            ${celebrationHabitId === habit.id ? 'animate-bounce' : ''}
-                          `}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            increaseProgress(habit.id);
-                          }}
-                          disabled={habit.completed}
-                        >
-                          {habit.completed ? (
-                            <Sparkles size={16} className="animate-spin" />
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                          )}
-                        </button>
                       </div>
-                      
-                      {/* Поздравительное сообщение */}
-                      {celebrationHabitId === habit.id && (
-                        <div className="mt-2 text-center text-sm font-medium text-green-600 animate-pulse">
-                          🎉 Молодец! Цель достигнута! 🎉
-                        </div>
-                      )}
                     </div>
 
                     {/* Кнопки действий */}
-                    {showButtons[habit.id] && (
+                    {showButtons[habit.id] && !isAnimating && (
                       <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                         <button 
                           className="w-12 h-20 bg-green-500 rounded-xl flex flex-col items-center justify-center text-white shadow-sm hover:bg-green-600 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            console.log('Редактировать', habit.id);
+                            navigate('/create-habit', { 
+                              state: { 
+                                selectedDate: selectedDate,
+                                habitToEdit: habit
+                              } 
+                            });
                             setSwipedHabitId(null);
                             setShowButtons(prev => ({ ...prev, [habit.id]: false }));
                           }}
@@ -530,14 +615,22 @@ export default function HabitTracker() {
             })
           ) : (
             <div className="text-center py-8">
-              <p className="text-blue-400 text-lg">Нет задач на этот день</p>
+              <p className="text-blue-400 text-lg">
+                {selectedGroup !== 'all' 
+                  ? `Нет задач в группе "${selectedGroup}" на этот день` 
+                  : 'Нет задач на этот день'}
+              </p>
             </div>
           )}
         </div>
 
         {/* Кнопка добавления привычки */}
         <button 
-          onClick={() => navigate('/create-habit', { state: { selectedDate } })}
+          onClick={() => {
+            navigate('/create-habit', { 
+              state: { selectedDate: selectedDate }
+            });
+          }}
           className="w-full bg-blue-900 text-white py-4 rounded-xl text-lg font-medium hover:bg-blue-800 transition-colors"
         >
           Добавить привычку
