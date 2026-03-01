@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, NavLink } from 'react-router-dom';
-import { Home, Repeat, BookOpen, StickyNote, Settings } from 'lucide-react';
+import { Home, Repeat, BookOpen, StickyNote, Settings, Calendar } from 'lucide-react';
 
 export default function CreateHabit() {
   const navigate = useNavigate();
@@ -12,9 +12,51 @@ export default function CreateHabit() {
     habitToEdit: null 
   };
   
-  console.log('Editing habit:', habitToEdit); // Для отладки
+  console.log('Editing habit:', habitToEdit);
 
-  // Инициализируем форму данными из редактируемой привычки или пустыми значениями
+  // Сохраняем прогресс из редактируемой привычки
+  const savedProgress = habitToEdit?.progress || 0;
+
+  // Состояния для периодичности (упрощенные)
+  const [recurrenceEnabled, setRecurrenceEnabled] = useState(!!habitToEdit?.recurrence);
+  const [recurrenceWeekDays, setRecurrenceWeekDays] = useState(habitToEdit?.recurrence?.weekDays || [1,2,3,4,5]); // пн-пт по умолчанию
+  const [recurrenceDuration, setRecurrenceDuration] = useState(habitToEdit?.recurrence?.duration || 'week'); // week, 2weeks, month, year
+
+  // Функция для генерации дат на основе упрощенной периодичности
+  const generateRecurringDates = (startDate) => {
+    if (!recurrenceEnabled) return [startDate];
+
+    const dates = [];
+    const start = new Date(startDate);
+    
+    // Определяем количество дней в зависимости от длительности
+    let daysToAdd = 0;
+    switch (recurrenceDuration) {
+      case 'week': daysToAdd = 7; break;
+      case '2weeks': daysToAdd = 14; break;
+      case 'month': daysToAdd = 30; break;
+      case 'year': daysToAdd = 365; break;
+      default: daysToAdd = 7;
+    }
+    
+    const endDate = new Date(start);
+    endDate.setDate(endDate.getDate() + daysToAdd);
+    
+    let currentDate = new Date(start);
+    
+    while (currentDate <= endDate) {
+      const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // конвертируем вс(0) в 7
+      
+      if (recurrenceWeekDays.includes(dayOfWeek)) {
+        dates.push(new Date(currentDate));
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return dates;
+  };
+
   const [formData, setFormData] = useState({
     emoji: habitToEdit?.emoji || '📝',
     title: habitToEdit?.title || '',
@@ -29,9 +71,6 @@ export default function CreateHabit() {
   const [scaleUnit, setScaleUnit] = useState(habitToEdit?.scale?.unit || 'шт');
   const [customUnit, setCustomUnit] = useState('');
   const [showCustomUnit, setShowCustomUnit] = useState(false);
-
-  // Сохраняем прогресс из редактируемой привычки (только для внутреннего использования)
-  const savedProgress = habitToEdit?.progress || 0;
 
   // Предустановленные единицы измерения
   const presetUnits = [
@@ -66,40 +105,51 @@ export default function CreateHabit() {
   };
 
   const handleSubmit = (e) => {
-  e.preventDefault();
-  
-  // Определяем финальную единицу измерения
-  const finalUnit = showCustomUnit ? customUnit : scaleUnit;
-  
-  const habitData = {
-    ...formData,
-    id: habitToEdit?.id || Date.now(),
-    date: selectedDate.toDateString(), // используем selectedDate из state
-    completed: false,
-    progress: savedProgress,
-    scale: scaleEnabled ? { 
-      value: scaleValue, 
-      unit: finalUnit 
-    } : null,
-    reminders: reminderEnabled ? reminderTimes : []
+    e.preventDefault();
+    
+    // Определяем финальную единицу измерения
+    const finalUnit = showCustomUnit ? customUnit : scaleUnit;
+    
+    // Генерируем даты для периодичности
+    const recurrenceDates = recurrenceEnabled 
+      ? generateRecurringDates(selectedDate)
+      : [selectedDate];
+    
+    // Создаем отдельные задачи для каждой даты
+    const newHabits = recurrenceDates.map((date, index) => ({
+      ...formData,
+      id: habitToEdit?.id ? habitToEdit.id + index : Date.now() + index,
+      date: date.toDateString(),
+      completed: false,
+      progress: savedProgress,
+      scale: scaleEnabled ? { 
+        value: scaleValue, 
+        unit: finalUnit 
+      } : null,
+      reminders: reminderEnabled ? reminderTimes : [],
+      recurrence: recurrenceEnabled ? {
+        weekDays: recurrenceWeekDays,
+        duration: recurrenceDuration,
+        parentId: habitToEdit?.id || Date.now() // для группировки связанных задач
+      } : null
+    }));
+    
+    const existingHabits = JSON.parse(localStorage.getItem('habits') || '[]');
+    
+    let updatedHabits;
+    if (habitToEdit) {
+      // При редактировании удаляем старые задачи этой группы и добавляем новые
+      const otherHabits = existingHabits.filter(h => h.recurrence?.parentId !== habitToEdit.recurrence?.parentId);
+      updatedHabits = [...otherHabits, ...newHabits];
+    } else {
+      updatedHabits = [...existingHabits, ...newHabits];
+    }
+    
+    localStorage.setItem('habits', JSON.stringify(updatedHabits));
+    
+    // Возвращаемся на исходную дату
+    navigate('/habits', { state: { selectedDate: selectedDate } });
   };
-  
-  const existingHabits = JSON.parse(localStorage.getItem('habits') || '[]');
-  
-  let updatedHabits;
-  if (habitToEdit) {
-    updatedHabits = existingHabits.map(h => 
-      h.id === habitToEdit.id ? habitData : h
-    );
-  } else {
-    updatedHabits = [...existingHabits, habitData];
-  }
-  
-  localStorage.setItem('habits', JSON.stringify(updatedHabits));
-  
-  // ВАЖНО: передаем selectedDate обратно, чтобы остаться на том же дне
-  navigate('/habits', { state: { selectedDate: selectedDate } });
-};
 
   const handleGroupClick = () => {
     setShowGroupInput(true);
@@ -289,7 +339,126 @@ export default function CreateHabit() {
             </div>
           </div>
 
-          {/* БЛОК 2: Шкала измерения */}
+          {/* БЛОК 2: Периодичность */}
+          <div className="bg-white rounded-3xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-base text-gray-700">Повторять</span>
+              <button
+                type="button"
+                onClick={() => setRecurrenceEnabled(!recurrenceEnabled)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ease-in-out ${
+                  recurrenceEnabled ? 'bg-blue-900' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-in-out ${
+                    recurrenceEnabled ? 'transform translate-x-6' : ''
+                  }`}
+                />
+              </button>
+            </div>
+
+            {recurrenceEnabled && (
+              <div className="space-y-4">
+                
+                {/* Дни недели */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">В какие дни</label>
+                  <div className="flex gap-2">
+                    {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((day, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          const dayNum = index + 1;
+                          if (recurrenceWeekDays.includes(dayNum)) {
+                            setRecurrenceWeekDays(recurrenceWeekDays.filter(d => d !== dayNum));
+                          } else {
+                            setRecurrenceWeekDays([...recurrenceWeekDays, dayNum].sort());
+                          }
+                        }}
+                        className={`
+                          w-9 h-9 rounded-full text-sm font-medium transition-all
+                          ${recurrenceWeekDays.includes(index + 1)
+                            ? 'bg-blue-900 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }
+                        `}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Длительность */}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-2">Повторять в течение</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecurrenceDuration('week')}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 transition-all text-sm
+                        ${recurrenceDuration === 'week' 
+                          ? 'border-blue-900 bg-blue-50' 
+                          : 'border-gray-200 hover:border-blue-400'
+                        }
+                      `}
+                    >
+                      1 неделю
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecurrenceDuration('2weeks')}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 transition-all text-sm
+                        ${recurrenceDuration === '2weeks' 
+                          ? 'border-blue-900 bg-blue-50' 
+                          : 'border-gray-200 hover:border-blue-400'
+                        }
+                      `}
+                    >
+                      2 недели
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecurrenceDuration('month')}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 transition-all text-sm
+                        ${recurrenceDuration === 'month' 
+                          ? 'border-blue-900 bg-blue-50' 
+                          : 'border-gray-200 hover:border-blue-400'
+                        }
+                      `}
+                    >
+                      Месяц
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecurrenceDuration('year')}
+                      className={`
+                        flex-1 py-2 rounded-xl border-2 transition-all text-sm
+                        ${recurrenceDuration === 'year' 
+                          ? 'border-blue-900 bg-blue-50' 
+                          : 'border-gray-200 hover:border-blue-400'
+                        }
+                      `}
+                    >
+                      Год
+                    </button>
+                  </div>
+                </div>
+
+                {/* Информация */}
+                <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
+                  📅 Будет создано ~{generateRecurringDates(selectedDate).length} задач
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* БЛОК 3: Шкала измерения */}
           <div className="bg-white rounded-3xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <span className="text-base text-gray-700">Шкала измерения</span>
@@ -416,7 +585,7 @@ export default function CreateHabit() {
             )}
           </div>
 
-          {/* БЛОК 3: Напоминание */}
+          {/* БЛОК 4: Напоминание */}
           <div className="bg-white rounded-3xl p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <span className="text-base text-gray-700">Напоминание</span>
